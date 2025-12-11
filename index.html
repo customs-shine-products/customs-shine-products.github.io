@@ -73,7 +73,7 @@
             </div>
             
             <div class="flex items-center gap-2">
-                <div id="statusBadge" class="hidden px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 flex items-center gap-1.5">
+                <div id="statusBadge" class="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 flex items-center gap-1.5">
                     <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Server Active
                 </div>
                 <button id="themeToggle" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 transition">
@@ -201,8 +201,8 @@
         // --- CONFIG & STATE ---
         if (typeof pdfjsLib !== 'undefined') pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
         
-        // REPLACE THIS URL WITH YOUR RENDER URL
-        const BACKEND_URL = "https://prooflens-hzq2.onrender.com"; 
+        // --- YOUR BACKEND URL ---
+        const BACKEND_URL = "https://prooflens-hzq2.onrender.com/analyze"; 
 
         let requestQueue = [];
         let isProcessing = false;
@@ -220,12 +220,11 @@
         };
 
         // --- INIT ---
-        document.getElementById('statusBadge').classList.remove('hidden');
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
         }
 
-        // --- LOCAL LOGIC ENGINE (Load Balancer) ---
+        // --- LOCAL LOGIC ENGINE ---
         function getReadability(text) {
             const words = text.match(/\w+/g)?.length || 1;
             const sentences = text.split(/[.!?]+/).length || 1;
@@ -277,7 +276,7 @@
                 this.isProcessing = true;
                 const task = this.queue.shift();
                 
-                // Backend handles rate limiting, so we just process sequentially
+                // Backend handles rate limiting logic
                 try {
                     await task();
                 } catch(e) {
@@ -291,11 +290,10 @@
         const globalQueue = new RequestQueue();
 
         async function callGemini(payload, tools = false) {
-            // No API key check here - server handles it.
             const cacheKey = JSON.stringify(payload);
             if (cache.has(cacheKey)) return cache.get(cacheKey);
 
-            // Extract prompt text. Backend expects { "prompt": "..." }
+            // Backend expects just the prompt string
             const promptText = payload.contents?.[0]?.parts?.[0]?.text;
             if (!promptText) return null;
 
@@ -311,7 +309,7 @@
                 
                 const data = await response.json();
                 
-                // Reconstruct to match expected format by frontend logic
+                // Convert simple text response back to Gemini format for compatibility
                 const geminiStyleResponse = {
                     candidates: [{
                         content: {
@@ -340,7 +338,7 @@
             els.resultsPanel.classList.add('closed');
         }
 
-        // --- FEATURES (Same logic, now routed through new callGemini) ---
+        // --- FEATURES ---
 
         async function runAnalysis(type) {
             const text = els.editor.innerText;
@@ -349,6 +347,7 @@
             els.resultsPanel.classList.remove('closed');
             els.resultsContent.innerHTML = '';
             
+            // LOCAL LAYER
             if (type === 'Full Review') {
                 const stats = getLocalStats(text);
                 const score = getReadability(text);
@@ -380,7 +379,7 @@
                     const suspectsPrompt = `Identify the top 3 sentences in this text that are most likely to be plagiarized. Return strictly a JSON array of strings: ["sentence 1", "sentence 2"]`;
                     const res = await callGemini({ contents: [{ parts: [{ text: suspectsPrompt + `\n\nTEXT: """${text}"""` }] }] });
                     
-                    if (!res) { showToast("Analysis failed", 'error'); return; }
+                    if (!res) return;
                     
                     let suspects = [];
                     try { 
@@ -429,7 +428,7 @@
                     });
 
                 } else if (type === 'Fact Check') {
-                    const claimPrompt = `Extract distinct factual claims. Return JSON: {"claims": ["claim 1", "claim 2"]}`;
+                    const claimPrompt = `Extract distinct factual claims. Return strictly JSON: {"claims": ["claim 1", "claim 2"]}`;
                     const res = await callGemini({ contents: [{ parts: [{ text: claimPrompt + `\n\nTEXT: """${text}"""` }] }] });
                     
                     let claims = [];
@@ -475,8 +474,11 @@
                     });
 
                 } else if (type === 'Grammar' || type === 'Spelling' || type === 'Vocab') {
+                    // Standard single-call checks
                     const prompt = `Analyze for ${type}. Return JSON array: [{"original": "...", "suggestion": "...", "explanation": "..."}]`;
                     const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] });
+                    
+                    if (!res) return;
                     let items = [];
                     try { 
                         const extracted = extractJson(res);
@@ -494,7 +496,8 @@
                 } else if (type === 'Full Review') {
                     const prompt = `Act as an editor. Return HTML report with <h3> headers for Clarity, Structure, Grammar. Use Tailwind classes.`;
                     const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] });
-                    // Append AI result below Local Stats
+                    
+                    if (!res) return;
                     const prevContent = els.resultsContent.innerHTML;
                     els.resultsContent.innerHTML = prevContent.replace(/<div class="skeleton.*<\/div>/g, '') + res.candidates[0].content.parts[0].text;
                     els.panelProgress.classList.add('hidden');
@@ -502,12 +505,16 @@
                 } else if (type === 'Summarize') {
                     const prompt = `Summarize this in HTML bullet points.`;
                     const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] });
+                    
+                    if (!res) return;
                     els.resultsContent.innerHTML = `<h3 class="font-bold mb-2">Summary</h3>` + res.candidates[0].content.parts[0].text;
                     els.panelProgress.classList.add('hidden');
                     
                 } else if (type === 'AI Check') {
                      const prompt = `Analyze for AI generation (perplexity/burstiness). Return JSON: {"probability": 0.XX, "explanation": "..."}.`;
                      const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] });
+                     
+                     if (!res) return;
                      let data = {};
                      try { 
                         const extracted = extractJson(res);

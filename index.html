@@ -1,666 +1,638 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SrcEdit Document Reviewer</title>
+    <title>ProofLens | Professional Reviewer</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Libraries for file reading -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1', 900: '#0c4a6e' },
+                        dark: { 800: '#1e293b', 900: '#0f172a', 950: '#020617' }
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], serif: ['Merriweather', 'serif'] },
+                    animation: { 'fade-in': 'fadeIn 0.3s ease-out', 'slide-in': 'slideIn 0.3s ease-out' },
+                    keyframes: {
+                        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+                        slideIn: { '0%': { transform: 'translateX(100%)' }, '100%': { transform: 'translateX(0)' } }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.5.1/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        #editor { outline: none; white-space: pre-wrap; word-wrap: break-word; min-height: 40vh; }
-        .highlight { border-radius: 3px; padding: 1px 0; cursor: pointer; }
-        .highlight-spell { background-color: rgba(255, 219, 219, 0.8); border-bottom: 2px dotted #ef4444; }
-        .highlight-grammar { background-color: rgba(219, 234, 254, 0.8); border-bottom: 2px dotted #3b82f6; }
-        .highlight-vocab { background-color: rgba(254, 249, 195, 0.8); border-bottom: 2px dotted #f59e0b; }
-        .tooltip { position: absolute; display: none; background-color: #1f2937; color: white; padding: 10px; border-radius: 8px; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 300px; }
-        .tooltip-arrow { position: absolute; bottom: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: transparent transparent #1f2937 transparent; }
-        .suggestion-btn { background-color: #374151; color: #d1d5db; padding: 4px 8px; border-radius: 4px; margin-top: 8px; margin-right: 4px; border: 1px solid #4b5563; }
-        .suggestion-btn:hover { background-color: #4b5563; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .api-key-bar { transition: background-color 0.3s; }
-        #fileUploadLabel { cursor: pointer; }
-        #progressBar { transition: width 0.3s ease-in-out; }
-        .tone-option-btn { background-color: #f3f4f6; color: #1f2937; padding: 10px; border-radius: 8px; text-align: center; font-weight: 500; transition: all 0.2s; border: 1px solid #d1d5db; cursor: pointer; }
-        .tone-option-btn:hover { background-color: #e5e7eb; transform: translateY(-2px); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        
+        #editor { outline: none; min-height: 100%; line-height: 1.8; font-family: 'Merriweather', serif; font-size: 1.05rem; }
+        
+        /* Highlights */
+        .highlight { border-radius: 4px; padding: 1px 0; cursor: pointer; border-bottom: 2px solid; transition: all 0.2s; }
+        .highlight:hover { background-color: rgba(255,255,0,0.2); }
+        .highlight-grammar { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.1); }
+        .highlight-spell { border-color: #ef4444; background-color: rgba(239, 68, 68, 0.1); }
+        .highlight-vocab { border-color: #eab308; background-color: rgba(234, 179, 8, 0.1); }
+
+        /* UI Components */
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .dark .glass { background: rgba(15, 23, 42, 0.8); border-bottom: 1px solid rgba(255,255,255,0.05); }
+        
+        .side-panel { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .side-panel.closed { transform: translateX(100%); }
+        
+        /* Toast Notification */
+        .toast { position: fixed; bottom: 24px; right: 24px; z-index: 100; animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Skeleton Loading */
+        .skeleton { background: #e2e8f0; border-radius: 4px; animation: pulse 1.5s infinite; }
+        .dark .skeleton { background: #334155; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: .5; } 100% { opacity: 1; } }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-gray-50 text-slate-800 dark:bg-dark-950 dark:text-slate-100 h-screen flex flex-col overflow-hidden">
 
-    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
-        <header class="text-center mb-6">
-            <h1 class="text-4xl md:text-5xl font-bold text-gray-900">IntelliWrite Document Reviewer</h1>
-            <p class="text-gray-600 mt-2">Upload a .docx or .pdf file to begin your AI-powered review.</p>
-        </header>
-        
-        <div id="apiKeySection" class="api-key-bar bg-red-100 border border-red-300 p-4 rounded-lg mb-6 shadow-sm">
-             <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div class="flex-grow">
-                    <label for="apiKeyInput" class="block font-semibold text-red-800 mb-1">API Key Required</label>
-                    <input type="password" id="apiKeyInput" placeholder="Paste your Google AI API Key here" class="w-full p-2 border border-red-300 rounded-md focus:ring-2 focus:ring-red-400 focus:outline-none">
+    <!-- Navbar -->
+    <header class="h-16 glass flex-none z-50">
+        <div class="container mx-auto h-full px-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-primary-600 p-1.5 rounded-lg text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 </div>
-                <button id="saveApiKeyBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition-transform transform hover:scale-105 self-start sm:self-end">Save Key</button>
+                <h1 class="text-xl font-bold tracking-tight">ProofLens</h1>
             </div>
-            <p id="apiKeyStatus" class="text-sm text-red-700 mt-2">To use the AI features, you need a free Google AI API key. <a href="https://aistudio.google.com/app/apikey" target="_blank" class="font-semibold underline hover:text-red-800">Get one here.</a></p>
+            
+            <div class="flex items-center gap-2">
+                <div id="statusBadge" class="hidden px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Server Active
+                </div>
+                <button id="themeToggle" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                </button>
+            </div>
         </div>
+    </header>
 
-        <!-- File Upload Section -->
-        <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6 md:p-8 mb-6">
-            <h2 class="text-2xl font-bold mb-4 text-gray-800">1. Upload Document</h2>
-            <div class="flex items-center justify-center w-full">
-                <label for="fileUpload" id="fileUploadLabel" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg bg-gray-50 hover:bg-gray-100">
-                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                        <svg class="w-8 h-8 mb-2 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/></svg>
-                        <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Click to upload</span> or drag and drop</p>
-                        <p class="text-xs text-gray-500">DOCX or PDF</p>
-                    </div>
+    <!-- Main Workspace -->
+    <div class="flex-grow flex overflow-hidden relative">
+        
+        <!-- Left Sidebar: Tools -->
+        <aside class="w-64 flex-none bg-white dark:bg-dark-800 border-r border-gray-200 dark:border-gray-800 flex flex-col z-20">
+            <div class="p-4 space-y-1 overflow-y-auto flex-grow">
+                <!-- File Upload Area -->
+                <label for="fileUpload" id="uploadSection" class="block mb-6 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-primary-500 dark:hover:border-primary-500 transition-colors cursor-pointer text-center group">
                     <input id="fileUpload" type="file" class="hidden" accept=".pdf,.docx" />
+                    <svg class="w-8 h-8 mx-auto text-gray-400 group-hover:text-primary-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <p class="text-xs text-gray-500 font-medium">Click to Upload</p>
                 </label>
-            </div>
-            <div id="progressContainer" class="w-full bg-gray-200 rounded-full h-2.5 mt-3 hidden">
-                <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
-            </div>
-            <p id="fileName" class="text-center text-gray-600 mt-3 font-medium"></p>
-        </div>
 
-        <main class="bg-white rounded-xl shadow-lg p-4 sm:p-6 md:p-8">
-            <h2 class="text-2xl font-bold mb-4 text-gray-800">2. Review & Analyze</h2>
-            <div class="flex flex-wrap gap-2 md:gap-4 border-b border-gray-200 pb-4 mb-4">
-                <button id="fullReviewBtn" class="action-btn flex-1 sm:flex-none bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">Full Review</button>
-                <button id="checkGrammarBtn" class="action-btn flex-1 sm:flex-none bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">Grammar & Style</button>
-                <button id="spellCheckBtn" class="action-btn flex-1 sm:flex-none bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">Spell Check</button>
-                <button id="vocabEnhancerBtn" class="action-btn flex-1 sm:flex-none bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">Vocabulary</button>
-                <button id="changeToneBtn" class="action-btn flex-1 sm:flex-none bg-cyan-500 hover:bg-cyan-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">Change Tone</button>
-                <button id="humanizeBtn" class="action-btn flex-1 sm:flex-none bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">Humanize Text</button>
-                <button id="plagiarismBtn" class="action-btn flex-1 sm:flex-none bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">Plagiarism</button>
-                <button id="factCheckBtn" class="action-btn flex-1 sm:flex-none bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">Fact-Check</button>
-                <button id="aiContentBtn" class="action-btn flex-1 sm:flex-none bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">AI Check</button>
-                <button id="summarizeBtn" class="action-btn flex-1 sm:flex-none bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">Summarize</button>
-                <button id="readAloudBtn" class="action-btn flex-1 sm:flex-none bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">Read Aloud</button>
-                <button id="clearHighlightsBtn" class="flex-1 sm:flex-none bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">Clear</button>
+                <div id="fileInfoSection" class="hidden mb-6 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex items-center justify-between">
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        <svg class="w-4 h-4 text-primary-500 flex-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span id="fileName" class="text-xs font-medium truncate">doc.pdf</span>
+                    </div>
+                    <button id="clearFileBtn" class="text-gray-400 hover:text-red-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                </div>
+
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Analysis</h3>
+                        <button onclick="runAnalysis('Full Review')" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>Full Audit Report</button>
+                        <button onclick="runAnalysis('Plagiarism')" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Plagiarism Check</button>
+                        <button onclick="runAnalysis('Fact Check')" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Fact Verification</button>
+                        <button onclick="runAnalysis('AI Check')" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>AI Detection</button>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Proofing</h3>
+                        <div class="grid grid-cols-3 gap-1">
+                            <button onclick="runAnalysis('Grammar')" class="tool-btn p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-blue-50 text-xs font-medium text-center border border-gray-200 dark:border-gray-600">Grammar</button>
+                            <button onclick="runAnalysis('Spelling')" class="tool-btn p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-blue-50 text-xs font-medium text-center border border-gray-200 dark:border-gray-600">Spelling</button>
+                            <button onclick="runAnalysis('Vocab')" class="tool-btn p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-blue-50 text-xs font-medium text-center border border-gray-200 dark:border-gray-600">Vocab</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Transform</h3>
+                        <button onclick="openToneModal()" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">Change Tone</button>
+                        <button onclick="runAnalysis('Humanize')" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">Humanize Text</button>
+                        <button onclick="runAnalysis('Summarize')" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">Summarize</button>
+                    </div>
+                </div>
             </div>
             
-            <div id="editor-container" class="border border-gray-300 rounded-lg p-4 focus-within:ring-2 focus-within:ring-blue-400 bg-gray-50">
-                <div id="editor" contenteditable="true" aria-multiline="true" role="textbox" aria-label="Text editor"></div>
+            <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+                <button onclick="exportReport()" class="w-full py-2 bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition shadow-sm flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Export Report
+                </button>
             </div>
+        </aside>
 
-            <div id="statusBar" class="text-sm text-gray-500 mt-2 h-6 flex items-center gap-2">
-                <div id="loader" class="loader hidden"></div>
-                <span id="statusText">Ready</span>
-            </div>
+        <!-- Center: Editor -->
+        <main class="flex-grow flex flex-col h-full overflow-hidden bg-gray-50 dark:bg-dark-900 relative">
             
-            <div id="audioPlayerContainer" class="mt-4 hidden">
-                <audio id="audioPlayer" controls class="w-full"></audio>
+            <!-- Editor -->
+            <div class="flex-grow overflow-y-auto p-8 md:p-12">
+                <div class="max-w-3xl mx-auto bg-white dark:bg-dark-800 min-h-[800px] shadow-sm rounded-xl p-8 md:p-12 border border-gray-100 dark:border-gray-700 transition-colors">
+                    <div id="editor" contenteditable="true" class="prose dark:prose-invert max-w-none focus:outline-none" placeholder="Start typing or upload a document..."></div>
+                </div>
             </div>
         </main>
-        
-        <!-- MODALS -->
-        <div id="resultsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 id="modalTitle" class="text-xl font-bold">Results</h3>
-                    <button id="closeModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
-                </div>
-                <div id="modalContent" class="text-gray-700"></div>
+
+        <!-- Right Sidebar: Results Panel (Hidden by default) -->
+        <aside id="resultsPanel" class="w-96 flex-none bg-white dark:bg-dark-800 border-l border-gray-200 dark:border-gray-800 side-panel closed flex flex-col z-20 shadow-2xl absolute right-0 h-full lg:relative lg:transform-none lg:shadow-none">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+                <h3 class="font-bold text-sm uppercase tracking-wide text-gray-500">Analysis Results</h3>
+                <button onclick="closePanel()" class="lg:hidden text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
-        </div>
-        <div id="tooltip" class="tooltip">
-            <div id="tooltipContent"></div>
-            <div class="tooltip-arrow"></div>
+            
+            <div id="resultsContent" class="flex-grow overflow-y-auto p-4 space-y-4">
+                <!-- Content injected here -->
+                <div class="text-center mt-20 text-gray-400">
+                    <p class="text-4xl mb-4">🔍</p>
+                    <p class="text-sm">Select a tool from the left<br>to analyze your document.</p>
+                </div>
+            </div>
+
+            <!-- Progress Bar inside panel -->
+            <div id="panelProgress" class="hidden p-4 border-t border-gray-100 dark:border-gray-700">
+                <div class="flex justify-between text-xs font-medium mb-2">
+                    <span id="progressText">Processing...</span>
+                    <button onclick="stopQueue()" class="text-red-500 hover:underline">Stop</button>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                    <div id="progressBar" class="bg-primary-500 h-1.5 rounded-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- Tone Modal -->
+    <div id="toneModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white dark:bg-dark-800 p-6 rounded-xl shadow-xl w-80 animate-fade-in">
+            <h3 class="font-bold text-lg mb-4">Select Tone</h3>
+            <div class="space-y-2">
+                <button onclick="changeTone('Formal')" class="w-full p-3 text-left rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent hover:border-gray-200">🎩 Formal</button>
+                <button onclick="changeTone('Casual')" class="w-full p-3 text-left rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent hover:border-gray-200">☕ Casual</button>
+                <button onclick="changeTone('Persuasive')" class="w-full p-3 text-left rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent hover:border-gray-200">🔥 Persuasive</button>
+            </div>
+            <button onclick="document.getElementById('toneModal').classList.add('hidden')" class="mt-4 w-full py-2 text-sm text-gray-500">Cancel</button>
         </div>
     </div>
 
+    <!-- Tooltip -->
+    <div id="tooltip" class="tooltip bg-white dark:bg-dark-800 p-3 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-w-xs">
+        <div id="tooltipContent"></div>
+    </div>
+
     <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
+        // --- CONFIG & STATE ---
+        if (typeof pdfjsLib !== 'undefined') pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
         
-        const editor = document.getElementById('editor');
-        const statusText = document.getElementById('statusText');
-        const loader = document.getElementById('loader');
-        const fileUpload = document.getElementById('fileUpload');
-        const fileNameDisplay = document.getElementById('fileName');
-        const progressContainer = document.getElementById('progressContainer');
-        const progressBar = document.getElementById('progressBar');
-        const audioPlayerContainer = document.getElementById('audioPlayerContainer');
-        const audioPlayer = document.getElementById('audioPlayer');
-        const actionButtons = document.querySelectorAll('.action-btn');
-        const clearHighlightsBtn = document.getElementById('clearHighlightsBtn');
-        const apiKeySection = document.getElementById('apiKeySection');
-        const apiKeyInput = document.getElementById('apiKeyInput');
-        const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
-        const apiKeyStatus = document.getElementById('apiKeyStatus');
-        const resultsModal = document.getElementById('resultsModal');
-        const modalTitle = document.getElementById('modalTitle');
-        const modalContent = document.getElementById('modalContent');
-        const closeModalBtn = document.getElementById('closeModalBtn');
-        const tooltip = document.getElementById('tooltip');
-        const tooltipContent = document.getElementById('tooltipContent');
+        // REPLACE THIS URL WITH YOUR RENDER URL
+        const BACKEND_URL = "https://your-app-name.onrender.com/analyze"; 
 
-        let userApiKey = '';
-        let originalTextMap = new Map();
-        let suggestionCounter = 0;
-        let currentAudioUrl = null;
-        
-        function setStatus(text, isLoading = false) {
-            statusText.textContent = text;
-            loader.classList.toggle('hidden', !isLoading);
+        let requestQueue = [];
+        let isProcessing = false;
+        let abortController = null;
+        let cache = new Map();
+
+        const els = {
+            editor: document.getElementById('editor'),
+            resultsContent: document.getElementById('resultsContent'),
+            panelProgress: document.getElementById('panelProgress'),
+            progressBar: document.getElementById('progressBar'),
+            progressText: document.getElementById('progressText'),
+            fileUpload: document.getElementById('fileUpload'),
+            resultsPanel: document.getElementById('resultsPanel')
+        };
+
+        // --- INIT ---
+        document.getElementById('statusBadge').classList.remove('hidden');
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
         }
 
-        function updateButtonStates() {
-            const hasText = editor.textContent.trim().length > 0;
-            const hasApiKey = !!userApiKey;
-            actionButtons.forEach(btn => btn.disabled = !(hasText && hasApiKey));
+        // --- LOCAL LOGIC ENGINE (Load Balancer) ---
+        function getReadability(text) {
+            const words = text.match(/\w+/g)?.length || 1;
+            const sentences = text.split(/[.!?]+/).length || 1;
+            const syllables = text.split(/[aeiouy]{1,2}/i).length || 1;
+            const score = 206.835 - (1.015 * (words/sentences)) - (84.6 * (syllables/words));
+            return Math.max(0, Math.min(100, Math.round(score)));
         }
 
-        fileUpload.addEventListener('change', (event) => {
-            const file = event.target.files[0];
+        function getLocalStats(text) {
+            const words = text.match(/\w+/g)?.length || 0;
+            const sentences = text.split(/[.!?]+/).length;
+            const avgLen = Math.round(words/sentences) || 0;
+            return { words, sentences, avgLen };
+        }
+
+        // --- CORE FUNCTIONS ---
+
+        function showToast(msg, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast px-4 py-3 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 ${type === 'error' ? 'bg-red-500 text-white' : 'bg-slate-800 text-white'}`;
+            toast.innerHTML = type === 'error' ? `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> ${msg}` : msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
+        // --- QUEUE SYSTEM ---
+        class RequestQueue {
+            constructor() {
+                this.queue = [];
+                this.isProcessing = false;
+                this.isStopped = false;
+            }
+            
+            enqueue(taskFn) {
+                this.queue.push(taskFn);
+                this.processNext();
+            }
+            
+            stop() {
+                this.isStopped = true;
+                this.queue = [];
+                this.isProcessing = false;
+                els.panelProgress.classList.add('hidden');
+                showToast("Analysis stopped.", 'error');
+            }
+            
+            async processNext() {
+                if (this.isProcessing || this.queue.length === 0 || this.isStopped) return;
+                this.isProcessing = true;
+                const task = this.queue.shift();
+                
+                // Backend handles rate limiting, so we just process sequentially
+                try {
+                    await task();
+                } catch(e) {
+                    console.error("Queue task failed", e);
+                } finally {
+                    this.isProcessing = false;
+                    if (!this.isStopped) this.processNext();
+                }
+            }
+        }
+        const globalQueue = new RequestQueue();
+
+        async function callGemini(payload, tools = false) {
+            // No API key check here - server handles it.
+            const cacheKey = JSON.stringify(payload);
+            if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+            // Extract prompt text. Backend expects { "prompt": "..." }
+            const promptText = payload.contents?.[0]?.parts?.[0]?.text;
+            if (!promptText) return null;
+
+            try {
+                const response = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: promptText }),
+                    signal: abortController?.signal
+                });
+
+                if (!response.ok) throw new Error(`Server Error: ${response.status}`);
+                
+                const data = await response.json();
+                
+                // Reconstruct to match expected format by frontend logic
+                const geminiStyleResponse = {
+                    candidates: [{
+                        content: {
+                            parts: [{ text: data.result }]
+                        }
+                    }]
+                };
+
+                cache.set(cacheKey, geminiStyleResponse); 
+                return geminiStyleResponse;
+            } catch (e) {
+                if (e.name !== 'AbortError') {
+                    console.error(e);
+                    showToast("Error connecting to server.", 'error');
+                }
+                return null;
+            }
+        }
+
+        function stopQueue() {
+            if (abortController) abortController.abort();
+            globalQueue.stop();
+        }
+        
+        function closePanel() {
+            els.resultsPanel.classList.add('closed');
+        }
+
+        // --- FEATURES (Same logic, now routed through new callGemini) ---
+
+        async function runAnalysis(type) {
+            const text = els.editor.innerText;
+            if (!text.trim()) return showToast("Please add some text first.", 'error');
+            
+            els.resultsPanel.classList.remove('closed');
+            els.resultsContent.innerHTML = '';
+            
+            if (type === 'Full Review') {
+                const stats = getLocalStats(text);
+                const score = getReadability(text);
+                const color = score > 60 ? 'text-green-500' : 'text-orange-500';
+                els.resultsContent.innerHTML = `
+                    <div class="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm animate-fade-in">
+                        <h4 class="text-xs font-bold uppercase text-gray-400 mb-3">Instant Analysis (Local)</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><div class="text-2xl font-bold text-slate-800 dark:text-white">${stats.words}</div><div class="text-xs text-gray-500">Words</div></div>
+                            <div><div class="text-2xl font-bold ${color}">${score}</div><div class="text-xs text-gray-500">Readability Score</div></div>
+                        </div>
+                    </div>
+                    <div class="skeleton h-32 w-full mb-4"></div>
+                `;
+            } else {
+                for(let i=0; i<3; i++) els.resultsContent.innerHTML += `<div class="skeleton h-24 w-full mb-4"></div>`;
+            }
+            
+            abortController = new AbortController();
+            globalQueue.isStopped = false;
+            els.panelProgress.classList.remove('hidden');
+            els.progressText.textContent = `Running ${type}...`;
+            els.progressBar.style.width = '10%';
+
+            try {
+                let resultHTML = "";
+                
+                if (type === 'Plagiarism') {
+                    const suspectsPrompt = `Identify the top 3 sentences in this text that are most likely to be plagiarized. Return strictly a JSON array of strings: ["sentence 1", "sentence 2"]`;
+                    const res = await callGemini({ contents: [{ parts: [{ text: suspectsPrompt + `\n\nTEXT: """${text}"""` }] }] });
+                    
+                    if (!res) { showToast("Analysis failed", 'error'); return; }
+                    
+                    let suspects = [];
+                    try { 
+                        const extracted = extractJson(res);
+                        if (extracted) suspects = JSON.parse(extracted);
+                    } catch(e) {}
+                    
+                    if (!Array.isArray(suspects) || suspects.length === 0) {
+                         const sent = text.match(/[^\.!\?]+[\.!\?]+/g) || [];
+                         suspects = sent.slice(0, 3);
+                    }
+                    
+                    els.progressBar.style.width = '30%';
+                    let matches = [];
+                    let processed = 0;
+
+                    suspects.forEach((s, i) => {
+                        globalQueue.enqueue(async () => {
+                            if (globalQueue.isStopped) return;
+                            els.progressText.textContent = `Checking segment ${i+1}/${suspects.length}...`;
+                            
+                            const searchRes = await callGemini({ contents: [{ parts: [{ text: `Search Google for exactly: "${s}". Return JSON: {"snippet": "...", "url": "..."}` }] }] }, true);
+                            
+                            if (searchRes) {
+                                let data = {};
+                                try { 
+                                    const extracted = extractJson(searchRes);
+                                    if (extracted) data = JSON.parse(extracted);
+                                } catch(e){}
+                                const sim = jaccard(s, data.snippet || "");
+                                if (sim > 0.4) matches.push({s, ...data});
+                            }
+                            
+                            processed++;
+                            els.progressBar.style.width = `${30 + (processed/suspects.length * 70)}%`;
+                            
+                            if (processed === suspects.length) {
+                                const score = Math.round((matches.length / suspects.length) * 100);
+                                let details = matches.map(m => `<div class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-900 mb-2 text-sm"><p class="font-bold text-red-600">Matched:</p><p class="italic">"${m.s}"</p><a href="${m.url}" target="_blank" class="text-xs text-blue-500 underline truncate block mt-1">${m.url}</a></div>`).join('');
+                                
+                                resultHTML = `<div class="text-center p-6"><div class="text-5xl font-bold ${score > 20 ? 'text-red-500' : 'text-green-500'} mb-2">${score}%</div><p class="text-xs uppercase text-gray-500">Risk Score</p><p class="text-xs text-gray-400">Based on analysis of high-risk segments.</p></div><div class="mt-4">${details || '<p class="text-center text-gray-500">No matches found.</p>'}</div>`;
+                                els.resultsContent.innerHTML = resultHTML;
+                                els.panelProgress.classList.add('hidden');
+                            }
+                        });
+                    });
+
+                } else if (type === 'Fact Check') {
+                    const claimPrompt = `Extract distinct factual claims. Return JSON: {"claims": ["claim 1", "claim 2"]}`;
+                    const res = await callGemini({ contents: [{ parts: [{ text: claimPrompt + `\n\nTEXT: """${text}"""` }] }] });
+                    
+                    let claims = [];
+                    try { 
+                        const extracted = extractJson(res);
+                        if (extracted) claims = JSON.parse(extracted).claims || []; 
+                    } catch(e){}
+                    
+                    if (!claims.length) {
+                         els.resultsContent.innerHTML = "No verifiable claims found.";
+                         els.panelProgress.classList.add('hidden');
+                         return;
+                    }
+                    
+                    let factResults = [];
+                    let processed = 0;
+                    
+                    claims.forEach((claim, i) => {
+                        globalQueue.enqueue(async () => {
+                             if (globalQueue.isStopped) return;
+                             els.progressText.textContent = `Verifying fact ${i+1}/${claims.length}...`;
+                             
+                             const vRes = await callGemini({ contents: [{ parts: [{ text: `Verify: "${claim}". Return JSON: {"verdict": "True/False/Unsure", "source_url": "..."}` }] }] }, true);
+                             let data = { verdict: "Unsure", source_url: "#" };
+                             try { 
+                                const extracted = extractJson(vRes);
+                                if (extracted) data = JSON.parse(extracted); 
+                            } catch(e){}
+                             
+                             factResults.push({ claim, ...data });
+                             processed++;
+                             els.progressBar.style.width = `${(processed/claims.length * 100)}%`;
+                             
+                             if (processed === claims.length) {
+                                 resultHTML = `<h3 class="font-bold text-lg mb-4 px-2">Fact Verification</h3>` + factResults.map(r => {
+                                     const color = r.verdict.toLowerCase().includes('true') ? 'text-green-600' : 'text-orange-600';
+                                     return `<div class="p-3 border-b dark:border-gray-700"><div class="flex justify-between mb-1"><span class="font-semibold text-sm">${r.claim}</span><span class="text-xs font-bold ${color}">${r.verdict}</span></div><a href="${r.source_url}" class="text-xs text-blue-500 underline truncate block">Source</a></div>`;
+                                 }).join('');
+                                 els.resultsContent.innerHTML = resultHTML;
+                                 els.panelProgress.classList.add('hidden');
+                             }
+                        });
+                    });
+
+                } else if (type === 'Grammar' || type === 'Spelling' || type === 'Vocab') {
+                    const prompt = `Analyze for ${type}. Return JSON array: [{"original": "...", "suggestion": "...", "explanation": "..."}]`;
+                    const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] });
+                    let items = [];
+                    try { 
+                        const extracted = extractJson(res);
+                        if (extracted) {
+                            const parsed = JSON.parse(extracted);
+                            if (Array.isArray(parsed)) items = parsed;
+                        }
+                    } catch(e){}
+                    
+                    applyHighlights(items, type.toLowerCase());
+                    resultHTML = `<div class="text-center p-10"><div class="bg-green-100 dark:bg-green-900/30 text-green-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></div><h3 class="font-bold text-lg">Proofing Complete</h3><p class="text-sm text-gray-500">Found ${items.length} suggestions. Click highlighted text to apply.</p></div>`;
+                    els.resultsContent.innerHTML = resultHTML;
+                    els.panelProgress.classList.add('hidden');
+                
+                } else if (type === 'Full Review') {
+                    const prompt = `Act as an editor. Return HTML report with <h3> headers for Clarity, Structure, Grammar. Use Tailwind classes.`;
+                    const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] });
+                    // Append AI result below Local Stats
+                    const prevContent = els.resultsContent.innerHTML;
+                    els.resultsContent.innerHTML = prevContent.replace(/<div class="skeleton.*<\/div>/g, '') + res.candidates[0].content.parts[0].text;
+                    els.panelProgress.classList.add('hidden');
+                    
+                } else if (type === 'Summarize') {
+                    const prompt = `Summarize this in HTML bullet points.`;
+                    const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] });
+                    els.resultsContent.innerHTML = `<h3 class="font-bold mb-2">Summary</h3>` + res.candidates[0].content.parts[0].text;
+                    els.panelProgress.classList.add('hidden');
+                    
+                } else if (type === 'AI Check') {
+                     const prompt = `Analyze for AI generation (perplexity/burstiness). Return JSON: {"probability": 0.XX, "explanation": "..."}.`;
+                     const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] });
+                     let data = {};
+                     try { 
+                        const extracted = extractJson(res);
+                        if (extracted) data = JSON.parse(extracted); 
+                    } catch(e){}
+                     const score = Math.round(data.probability * 100);
+                     const color = score > 50 ? 'text-purple-600' : 'text-green-600';
+                     els.resultsContent.innerHTML = `<div class="text-center"><div class="text-4xl font-bold ${color} mb-2">${score}%</div><p class="text-sm text-gray-500">Likelihood of AI generation</p></div><div class="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">${data.explanation}</div>`;
+                     els.panelProgress.classList.add('hidden');
+                }
+
+            } catch (e) {
+                if (e.name !== 'AbortError') {
+                    console.error(e);
+                    els.resultsContent.innerHTML = `<div class="text-red-500 text-center p-4">Analysis Failed. Please try again.</div>`;
+                    els.panelProgress.classList.add('hidden');
+                }
+            }
+        }
+
+        // --- TONE CHANGE ---
+        function openToneModal() { document.getElementById('toneModal').classList.remove('hidden'); }
+        async function changeTone(tone) {
+            document.getElementById('toneModal').classList.add('hidden');
+            const text = els.editor.innerText;
+            if (!text.trim()) return;
+            
+            showToast(`Rewriting in ${tone} tone...`);
+            const res = await callGemini({ contents: [{ parts: [{ text: `Rewrite this in a ${tone} tone:\n\n${text}` }] }] });
+            if (res) els.editor.innerText = res.candidates[0].content.parts[0].text;
+        }
+
+        // --- UTILS ---
+        function extractJson(res) {
+            if(!res?.candidates?.[0]?.content?.parts?.[0]?.text) return null;
+            const txt = res.candidates[0].content.parts[0].text;
+            const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
+            const as = txt.indexOf('['), ae = txt.lastIndexOf(']');
+            
+            if (as > -1 && (s === -1 || as < s)) {
+                if (ae > as) return txt.substring(as, ae + 1);
+            } else if (s > -1) {
+                if (e > s) return txt.substring(s, e + 1);
+            }
+            return null;
+        }
+
+        function jaccard(s1, s2) {
+            const a = new Set(s1.toLowerCase().split(/\W+/));
+            const b = new Set(s2.toLowerCase().split(/\W+/));
+            const i = new Set([...a].filter(x => b.has(x)));
+            return i.size / new Set([...a, ...b]).size;
+        }
+
+        function applyHighlights(items, type) {
+            if (!items || !Array.isArray(items)) return;
+            let html = els.editor.innerText; 
+            items.forEach(i => {
+                html = html.replace(i.original, `<span class="highlight highlight-${type}" onclick="showTooltip(this, '${i.suggestion.replace(/'/g, "\\'")}', '${i.explanation.replace(/'/g, "\\'")}')">${i.original}</span>`);
+            });
+            els.editor.innerHTML = html;
+        }
+
+        window.showTooltip = (el, sugg, expl) => {
+            const tt = document.getElementById('tooltip');
+            tt.innerHTML = `<div class="font-bold text-sm mb-1">${sugg}</div><div class="text-xs text-gray-500 mb-2">${expl}</div><button onclick="replace(this, '${sugg.replace(/'/g, "\\'")}')" class="w-full bg-primary-600 text-white text-xs py-1 rounded">Accept</button>`;
+            const r = el.getBoundingClientRect();
+            tt.style.display = 'block';
+            tt.style.top = (r.bottom + window.scrollY + 5) + 'px';
+            tt.style.left = (r.left + window.scrollX) + 'px';
+            el.id = 'active-span';
+            event.stopPropagation();
+        }
+
+        window.replace = (btn, txt) => {
+            const sp = document.getElementById('active-span');
+            sp.outerHTML = txt;
+            document.getElementById('tooltip').style.display = 'none';
+        }
+
+        document.onclick = () => document.getElementById('tooltip').style.display = 'none';
+
+        // --- EXPORT ---
+        window.exportReport = () => {
+            const blob = new Blob([els.resultsContent.innerText + "\n\n---\nDoc Content:\n" + els.editor.innerText], {type: "text/plain"});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "prooflens_report.txt"; a.click();
+        }
+
+        // --- FILE UPLOAD ---
+        els.fileUpload.onchange = async (e) => {
+            const file = e.target.files[0];
             if (!file) return;
             
-            updateButtonStates(); 
-            fileNameDisplay.textContent = `Loading: ${file.name}`;
-            setStatus(`Processing ${file.name}...`, true);
-            editor.textContent = '';
-            progressContainer.classList.remove('hidden');
-            progressBar.style.width = '0%';
+            // UI Toggle
+            document.getElementById('uploadSection').classList.add('hidden');
+            document.getElementById('fileInfoSection').classList.remove('hidden');
+            document.getElementById('fileInfoSection').classList.add('flex');
+            document.getElementById('fileName').textContent = file.name;
 
             const reader = new FileReader();
-            
-            const onSuccess = (fileName) => {
-                setStatus(`Successfully loaded ${fileName}. Ready to review.`);
-                fileNameDisplay.textContent = `Loaded: ${fileName}`;
-                updateButtonStates(); 
-                setTimeout(() => progressContainer.classList.add('hidden'), 500);
-            };
-
-            const onError = (fileName, errorMsg, userFriendlyMsg) => {
-                console.error(errorMsg);
-                setStatus(userFriendlyMsg || `Error: Could not read ${fileName}.`);
-                fileNameDisplay.textContent = `Failed to load: ${fileName}`;
-                progressContainer.classList.add('hidden');
-            };
-
-            if (file.name.endsWith('.pdf')) {
-                reader.onload = async (e) => {
-                    try {
-                        const pdf = await pdfjsLib.getDocument(e.target.result).promise;
-                        let textContent = '';
-                        for (let i = 1; i <= pdf.numPages; i++) {
-                            const page = await pdf.getPage(i);
-                            const text = await page.getTextContent();
-                            textContent += text.items.map(s => s.str).join(' ') + '\n\n';
-                            progressBar.style.width = `${(i / pdf.numPages) * 100}%`;
-                        }
-                        editor.textContent = textContent;
-                        onSuccess(file.name);
-                    } catch (error) {
-                        const userMessage = "Failed to read .pdf file. It may be corrupt, encrypted, or in a format that could not be processed.";
-                        onError(file.name, `Error parsing PDF: ${error}`, userMessage);
-                    }
-                };
-                reader.readAsArrayBuffer(file);
-            } else if (file.name.endsWith('.docx')) {
-                progressBar.style.width = '50%';
-                reader.onload = (e) => {
-                    mammoth.extractRawText({ arrayBuffer: e.target.result })
-                        .then(result => {
-                            editor.textContent = result.value;
-                            progressBar.style.width = '100%';
-                            onSuccess(file.name);
-                        })
-                        .catch(error => {
-                            const userMessage = "Failed to read .docx file. It may be corrupt, password-protected, or an unsupported format (e.g., .doc instead of .docx).";
-                            onError(file.name, `Error parsing DOCX: ${error}`, userMessage);
-                        });
-                };
-                reader.readAsArrayBuffer(file);
-            } else {
-                onError(file.name, 'Unsupported file type.', 'Error: Unsupported file type. Please upload a .pdf or .docx file.');
-            }
-        });
-        
-        function saveApiKey() { 
-            const key = apiKeyInput.value.trim();
-            if (key) {
-                localStorage.setItem('geminiApiKey', key);
-                userApiKey = key;
-                updateApiKeyUI(true);
-                setStatus('API Key saved. Ready to use!');
-            }
-        }
-        function updateApiKeyUI(isValid) {
-            if (isValid) {
-                apiKeySection.classList.replace('bg-red-100', 'bg-green-100');
-                apiKeySection.classList.replace('border-red-300', 'border-green-300');
-                apiKeyStatus.innerHTML = `API Key is saved and active. <a href="#" id="removeKeyLink" class="font-semibold underline">Remove</a>`;
-                apiKeyStatus.classList.replace('text-red-700', 'text-green-800');
-                document.getElementById('removeKeyLink')?.addEventListener('click', removeApiKey);
-                apiKeyInput.style.display = 'none';
-                saveApiKeyBtn.style.display = 'none';
-            } else {
-                apiKeySection.classList.replace('bg-green-100', 'bg-red-100');
-                apiKeySection.classList.replace('border-green-300', 'border-red-300');
-                apiKeyStatus.innerHTML = `To use the AI features, you need a free Google AI API key. <a href="https://aistudio.google.com/app/apikey" target="_blank" class="font-semibold underline hover:text-red-800">Get one here.</a>`;
-                apiKeyStatus.classList.replace('text-green-800', 'text-red-700');
-                apiKeyInput.style.display = 'block';
-                saveApiKeyBtn.style.display = 'block';
-                userApiKey = '';
-            }
-            updateButtonStates();
-         }
-        function removeApiKey(e) { 
-            e.preventDefault();
-            localStorage.removeItem('geminiApiKey');
-            updateApiKeyUI(false);
-            setStatus('API Key removed.');
-        }
-        function loadApiKey() { 
-            const savedKey = localStorage.getItem('geminiApiKey');
-            if (savedKey) {
-                userApiKey = savedKey;
-                updateApiKeyUI(true);
-            } else {
-                updateApiKeyUI(false);
-            }
-        }
-        
-        async function callGeminiAPI(model, payload, retries = 3, delay = 1000) {
-            if (!userApiKey) { setStatus('Error: API Key is not set.'); return null; }
-            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${userApiKey}`;
-            for (let i = 0; i < retries; i++) {
-                try {
-                    const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                    if (!response.ok) { const errorBody = await response.json(); const errorMsg = errorBody.error?.message || `HTTP error! status: ${response.status}`; throw new Error(errorMsg); }
-                    return await response.json();
-                } catch (error) {
-                    console.error(`API call attempt ${i + 1} failed:`, error);
-                    if (i === retries - 1) { setStatus(`Error: ${error.message}`); return null; }
-                    await new Promise(res => setTimeout(res, delay * Math.pow(2, i)));
+            reader.onload = async (ev) => {
+                let text = "";
+                if (file.name.endsWith('.pdf')) {
+                    const pdf = await pdfjsLib.getDocument(ev.target.result).promise;
+                    for(let i=1; i<=pdf.numPages; i++) text += (await (await pdf.getPage(i)).getTextContent()).items.map(s=>s.str).join(' ');
+                } else if (file.name.endsWith('.docx')) {
+                    text = (await mammoth.extractRawText({ arrayBuffer: ev.target.result })).value;
                 }
-            }
-        }
-
-        async function getFullReview() {
-            const text = editor.textContent;
-            if (!text.trim()) { setStatus('Editor is empty. Upload a file first.'); return; }
-            setStatus('Performing full review...', true);
-            const systemPrompt = `You are an expert editor and writing coach. Analyze the following document and provide a comprehensive review. Structure your feedback using HTML. Your review must cover the following four sections, each with its own \`<h3>\` heading and styled with Tailwind CSS classes for better presentation (e.g., 'text-xl font-semibold mb-2 text-gray-800'): 1. **<h3>Clarity & Readability</h3>** * Evaluate the text for clarity, simplicity, and ease of understanding in a paragraph. * Use a \`<ul>\` to list any jargon, convoluted sentences, or ambiguous phrasing. * Provide a readability score (e.g., High School, College, etc.) and suggest improvements. 2. **<h3>Structure & Organization</h3>** * Assess the logical flow of the document in a paragraph. * Comment on the introduction, body, and conclusion. * Use a \`<ul>\` to list suggestions for improving transitions or topic sentences. 3. **<h3>Grammar & Language Quality</h3>** * Summarize the overall quality of the grammar, spelling, and punctuation. * Comment on the tone, style, and word choice. 4. **<h3>Content Value & Depth</h3>** * Evaluate the substance and depth of the content in a paragraph. * Does the text provide valuable insights? Is the analysis thorough? * Use a \`<ul>\` to identify any gaps or areas that could be explored in more detail. * Provide constructive feedback on how to increase the value and impact of the content. Provide your final output as a single block of well-formatted HTML. Use classes like 'p-2 rounded-lg bg-gray-100 mb-2' for list items to make them distinct.`;
-            const payload = { contents: [{ parts: [{ text }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
-            const result = await callGeminiAPI('gemini-2.5-flash', payload);
-            if (result) {
-                showModal('Comprehensive Document Review', result.candidates?.[0]?.content?.parts?.[0]?.text);
-            }
-            setStatus('Full review complete.');
-        }
-
-        async function checkGrammarAndStyle() {
-            const text = editor.textContent;
-            if (!text.trim()) { setStatus('Editor is empty. Upload a file first.'); return; }
-            setStatus('Checking grammar and style...', true);
-            const systemPrompt = `You are a writing assistant. Analyze the text for spelling, grammar, and style errors. Respond ONLY with a valid JSON array of objects. Each object must have these keys: "original", "suggestion", "type" ("highlight-spell" or "highlight-grammar"), and "explanation". Do not include any text before or after the JSON array.`;
-            const payload = { contents: [{ parts: [{ text: `Text: """${text}"""` }] }], systemInstruction: { parts: [{ text: systemPrompt }] }, generationConfig: { responseMimeType: "application/json" } };
-            const result = await callGeminiAPI('gemini-2.5-flash', payload);
-            if (!result) return;
-            const jsonResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
-            try {
-                const errors = JSON.parse(jsonResponse);
-                if (errors.length === 0) return setStatus('No issues found.');
-                const highlights = [];
-                let currentIndex = 0;
-                errors.forEach(error => {
-                    if (typeof error.original !== 'string') return;
-                    const index = text.indexOf(error.original, currentIndex);
-                    if (index !== -1) {
-                        highlights.push({ ...error, index });
-                        currentIndex = index + error.original.length;
-                    }
-                });
-                clearHighlights();
-                applyHighlights(highlights);
-                setStatus(`${highlights.length} suggestions found. Click on highlights to see them.`);
-            } catch (e) {
-                console.error("Error parsing grammar JSON:", e, jsonResponse);
-                setStatus('Error processing AI response.');
-            }
-        }
-        
-        async function checkSpelling() {
-            const text = editor.textContent;
-            if (!text.trim()) { setStatus('Editor is empty.'); return; }
-            setStatus('Checking for spelling errors...', true);
-            const systemPrompt = `Analyze the text for spelling errors ONLY. Respond with a valid JSON array of objects. Each object must have: "original", "suggestion", "type" (must be "highlight-spell"), and "explanation".`;
-            const payload = { contents: [{ parts: [{ text: `Text: """${text}"""` }] }], systemInstruction: { parts: [{ text: systemPrompt }] }, generationConfig: { responseMimeType: "application/json" } };
-            const result = await callGeminiAPI('gemini-2.5-flash', payload);
-            if (!result) return;
-            const jsonResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
-            try {
-                const errors = JSON.parse(jsonResponse).filter(e => e.type === 'highlight-spell');
-                if (errors.length === 0) return setStatus('No spelling errors found.');
-                const highlights = [];
-                let currentIndex = 0;
-                errors.forEach(error => {
-                    if (typeof error.original !== 'string') return;
-                    const index = text.indexOf(error.original, currentIndex);
-                    if (index !== -1) {
-                        highlights.push({ ...error, index });
-                        currentIndex = index + error.original.length;
-                    }
-                });
-                clearHighlights();
-                applyHighlights(highlights);
-                setStatus(`${highlights.length} spelling suggestions found.`);
-            } catch (e) {
-                console.error("Error parsing spelling JSON:", e, jsonResponse);
-                setStatus('Error processing spelling check response.');
-            }
-        }
-
-        async function enhanceVocabulary() {
-            const text = editor.textContent;
-            if (!text.trim()) { setStatus('Editor is empty.'); return; }
-            setStatus('Enhancing vocabulary...', true);
-            const systemPrompt = `You are a vocabulary assistant. Identify words or short phrases in the text that could be replaced with more dynamic, interesting, or precise language. Respond with a valid JSON array of objects. Each object must have: "original", "suggestion" (a stronger alternative), "type" (must be "highlight-vocab"), and "explanation" (why the suggestion is better).`;
-            const payload = { contents: [{ parts: [{ text: `Text: """${text}"""` }] }], systemInstruction: { parts: [{ text: systemPrompt }] }, generationConfig: { responseMimeType: "application/json" } };
-            const result = await callGeminiAPI('gemini-2.5-flash', payload);
-            if (!result) return;
-            const jsonResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
-            try {
-                const enhancements = JSON.parse(jsonResponse);
-                if (enhancements.length === 0) return setStatus('No vocabulary suggestions found.');
-                const highlights = [];
-                let currentIndex = 0;
-                enhancements.forEach(item => {
-                    if (typeof item.original !== 'string') return;
-                    const index = text.indexOf(item.original, currentIndex);
-                    if (index !== -1) {
-                        highlights.push({ ...item, index });
-                        currentIndex = index + item.original.length;
-                    }
-                });
-                clearHighlights();
-                applyHighlights(highlights);
-                setStatus(`${highlights.length} vocabulary enhancements found.`);
-            } catch (e) {
-                console.error("Error parsing vocabulary JSON:", e, jsonResponse);
-                setStatus('Error processing vocabulary enhancements.');
-            }
-        }
-
-        function openToneChanger() {
-            const tones = ['Formal', 'Casual', 'Business', 'Persuasive'];
-            let modalHtml = `<p class="mb-4">Select a tone to rewrite the entire document. This will replace the current text.</p>`;
-            modalHtml += `<div class="grid grid-cols-2 gap-4">`;
-            tones.forEach(tone => {
-                modalHtml += `<button class="tone-option-btn" onclick="rewriteTextInTone('${tone}')">${tone}</button>`;
-            });
-            modalHtml += `</div>`;
-            showModal('Change Document Tone', modalHtml);
-        }
-
-        async function rewriteTextInTone(tone) {
-            resultsModal.style.display = 'none'; 
-            const text = editor.textContent;
-            if (!text.trim()) return;
-            setStatus(`Rewriting text in a ${tone.toLowerCase()} tone...`, true);
-            const systemPrompt = `You are a writing assistant. Rewrite the following text to adopt a ${tone} tone. Respond ONLY with the rewritten text, without any additional commentary or explanation.`;
-            const payload = { contents: [{ parts: [{ text }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
-            const result = await callGeminiAPI('gemini-2.5-flash', payload);
-            if (result) {
-                editor.textContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
-            }
-            setStatus(`Text successfully rewritten in a ${tone.toLowerCase()} tone.`);
-        }
-
-        async function humanizeText() {
-            const text = editor.textContent;
-            if (!text.trim()) { setStatus('Editor is empty.'); return; }
-            setStatus('Humanizing text to evade AI detection...', true);
-            const systemPrompt = `You are an expert in linguistics and writing styles. Your task is to rewrite the following text to make it sound as if it were written by a human, with the specific goal of bypassing AI content detectors. To achieve this, you must:
-1.  Introduce variations in sentence length and structure. Use a mix of short, punchy sentences and longer, more complex ones.
-2.  Incorporate slight informalities, personal tone, or common expressions where appropriate, without sacrificing the core meaning.
-3.  Vary word choices to avoid repetitive or overly formal language often used by AI.
-4.  Break up uniform paragraphs and introduce more natural transitions.
-5.  Focus on perplexity and burstiness in the text.
-Respond ONLY with the rewritten, humanized text. Do not add any introductory phrases, explanations, or sign-offs.`;
-            const payload = { contents: [{ parts: [{ text }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
-            const result = await callGeminiAPI('gemini-2.5-flash', payload);
-            if (result) {
-                editor.textContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
-            }
-            setStatus('Text has been humanized.');
-        }
-
-        async function checkPlagiarism() {
-            const text = editor.textContent;
-            if (!text.trim()) { setStatus('Editor is empty. Upload a file first.'); return; }
-            setStatus('Checking for plagiarism...', true);
-            const systemPrompt = `First, count the total number of sentences in the provided text. Second, find sentences that might be plagiarized by searching for exact matches online. Return ONLY a valid JSON object with two keys: "totalSentences" (a number), and "plagiarismSources" (an array of objects, where each object has a 'sentence' and 'source' key). Example: { "totalSentences": 15, "plagiarismSources": [ { "sentence": "...", "source": "..." } ] }.`;
-            const payload = { 
-                contents: [{ parts: [{ text }] }], 
-                systemInstruction: { parts: [{ text: systemPrompt }] }, 
-                tools: [{ "google_search": {} }],
-                generationConfig: { temperature: 0 } 
+                els.editor.innerText = text;
             };
-            const result = await callGeminiAPI('gemini-2.5-flash', payload);
-            if (!result) return;
-            const jsonResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
-            try {
-                const cleanJsonResponse = jsonResponse.substring(jsonResponse.indexOf('{'), jsonResponse.lastIndexOf('}') + 1);
-                const results = JSON.parse(cleanJsonResponse);
-                const totalSentences = results.totalSentences || 0;
-                const plagiarizedCount = results.plagiarismSources ? results.plagiarismSources.length : 0;
-                const percentage = totalSentences > 0 ? ((plagiarizedCount / totalSentences) * 100).toFixed(0) : 0;
-                
-                let modalHtml = `<div class="text-center mb-4"><p class="text-lg font-medium">Plagiarism Detected:</p><p class="text-4xl font-bold text-green-600">${percentage}%</p></div>`;
-                modalHtml += `<p class="mb-4">This check looks for exact matches online. Common phrases may be flagged. Always verify the context.</p>`;
+            reader.readAsArrayBuffer(file);
+        };
 
-                if (plagiarizedCount > 0) {
-                    modalHtml += results.plagiarismSources.map(item => `<div class="mb-4 p-3 border rounded-lg bg-gray-50"><p class="font-semibold text-gray-800">Sentence:</p><blockquote class="pl-3 italic border-l-2 my-1">"${item.sentence}"</blockquote><p class="font-semibold text-gray-800 mt-2">Potential Source:</p><a href="${item.source}" target="_blank" class="text-blue-600 hover:underline break-all">${item.source}</a></div>`).join('');
-                } else {
-                    modalHtml += `<p class="text-green-600 font-semibold">No direct matches found online.</p>`;
-                }
-                showModal('Plagiarism Check Results', modalHtml);
-            } catch (e) {
-                console.error("Error parsing plagiarism JSON:", e, jsonResponse);
-                showModal('Error', '<p>Could not process the plagiarism check results. The AI response was not in the expected format.</p>');
-            }
-            setStatus('Plagiarism check complete.');
-        }
+        document.getElementById('clearFileBtn').onclick = () => {
+            els.editor.innerText = "";
+            document.getElementById('uploadSection').classList.remove('hidden');
+            document.getElementById('fileInfoSection').classList.add('hidden');
+            document.getElementById('fileInfoSection').classList.remove('flex');
+        };
 
-        async function factCheck() {
-            const text = editor.textContent;
-            if (!text.trim()) { setStatus('Editor is empty. Upload a file first.'); return; }
-            setStatus('Identifying and verifying facts...', true);
-            const claimPrompt = `From the text, identify verifiable factual claims. Return a JSON object: { "claims": ["claim 1", "claim 2"] }. Text: """${text}"""`;
-            const claimPayload = { contents: [{ parts: [{ text: claimPrompt }] }], generationConfig: { responseMimeType: "application/json" } };
-            const claimResponse = await callGeminiAPI('gemini-2.5-flash', claimPayload);
-            if (!claimResponse) return;
-            let claims;
-            try { claims = JSON.parse(claimResponse.candidates?.[0]?.content?.parts?.[0]?.text).claims; } catch (e) { return setStatus('Could not identify facts to check.'); }
-            if (!claims || claims.length === 0) return setStatus('No verifiable facts found in the text.');
-            
-            setStatus(`Found ${claims.length} claims. Verifying...`, true);
-            const verificationPromises = claims.map(claim => {
-                 const verifyPrompt = `Verify this claim: "${claim}". Provide a short summary, a confidence level ("Verified", "Uncertain", "False", etc.), and the top source URL. Respond ONLY with a valid JSON object with keys: "claim", "summary", "confidence", "source". Do not add any other text.`;
-                 const verifyPayload = { contents: [{ parts: [{ text: verifyPrompt }] }], tools: [{ "google_search": {} }] };
-                return callGeminiAPI('gemini-2.5-flash', verifyPayload);
-            });
-            
-            const results = await Promise.all(verificationPromises);
-            let modalHtml = `<p class="mb-4">AI-powered fact-checking. Information may not be 100% accurate. Always verify sources.</p>`;
-            let foundFacts = 0;
-            results.forEach(res => {
-                if (res) {
-                    try {
-                        const jsonResponse = res.candidates?.[0]?.content?.parts?.[0]?.text;
-                        const cleanJsonResponse = jsonResponse.substring(jsonResponse.indexOf('{'), jsonResponse.lastIndexOf('}') + 1);
-                        const verification = JSON.parse(cleanJsonResponse);
-                        const confidenceColor = {"Verified": "text-green-600 bg-green-100", "Likely True": "text-emerald-600 bg-emerald-100", "Uncertain": "text-yellow-600 bg-yellow-100", "Likely False": "text-orange-600 bg-orange-100", "False": "text-red-600 bg-red-100"}[verification.confidence] || "text-gray-600 bg-gray-100";
-                        modalHtml += `<div class="mb-4 p-3 border rounded-lg"><p class="font-semibold">Claim:</p><blockquote class="pl-3 italic border-l-2 my-1">"${verification.claim}"</blockquote><p class="font-semibold mt-2">Verdict: <span class="font-bold px-2 py-1 rounded-md ${confidenceColor}">${verification.confidence}</span></p><p class="mt-1">${verification.summary}</p><p class="font-semibold mt-2">Source:</p><a href="${verification.source}" target="_blank" class="text-blue-600 hover:underline break-all">${verification.source}</a></div>`;
-                        foundFacts++;
-                    } catch (e) { console.error("Error parsing verification JSON:", e, res.candidates?.[0]?.content?.parts?.[0]?.text); }
-                }
-            });
+        document.getElementById('themeToggle').onclick = () => {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+        };
 
-            if (foundFacts === 0) {
-                modalHtml += `<p>Could not verify the identified claims. The AI response may have been in an unexpected format.</p>`;
-            }
-
-            showModal('Fact-Check Results', modalHtml);
-            setStatus('Fact-check complete.');
-        }
-
-        async function checkAiContent() {
-            const text = editor.textContent;
-            if (!text.trim()) { setStatus('Editor is empty. Upload a file first.'); return; }
-            setStatus('Analyzing for AI-generated content...', true);
-            const systemPrompt = `You are an expert AI content detector. Analyze the provided text to determine the likelihood that it was written by an AI. Evaluate it based on metrics like **perplexity** (uniformity of word choice) and **burstiness** (variation in sentence structure and length). Look for overly formal language, lack of personal voice, and unnaturally smooth transitions. Respond ONLY with a valid JSON object with two keys: "probability" (a number between 0 and 1) and "explanation" (a brief rationale for your score, referencing perplexity and burstiness).`;
-            const payload = { 
-                contents: [{ parts: [{ text }] }], 
-                systemInstruction: { parts: [{ text: systemPrompt }] }, 
-                generationConfig: { 
-                    responseMimeType: "application/json",
-                    temperature: 0
-                } 
-            };
-            const result = await callGeminiAPI('gemini-2.5-flash', payload);
-            if (!result) return;
-            const jsonResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
-            try {
-                const analysis = JSON.parse(jsonResponse);
-                const percentage = (analysis.probability * 100).toFixed(0);
-                let modalHtml = `<p class="mb-4">This analysis is an estimate and should not be used as definitive proof. It's a tool to aid in your review process.</p>`;
-                modalHtml += `<div class="text-center mb-4"><p class="text-lg font-medium">Likelihood of AI Content:</p><p class="text-4xl font-bold text-purple-600">${percentage}%</p></div>`;
-                modalHtml += `<div class="p-3 border rounded-lg bg-gray-50"><p class="font-semibold text-gray-800">Rationale:</p><p>${analysis.explanation}</p></div>`;
-                showModal('AI Content Analysis', modalHtml);
-            } catch (e) {
-                console.error("Error parsing AI content JSON:", e, jsonResponse);
-                showModal('Error', '<p>Could not process the AI content analysis. The response was not in the expected format.</p>');
-            }
-            setStatus('AI content analysis complete.');
-        }
-        
-        async function summarizeText() {
-            const text = editor.textContent;
-            if (!text.trim()) { setStatus('Editor is empty. Upload a file first.'); return; }
-            setStatus('Summarizing text...', true);
-            const systemPrompt = "Summarize the text into key bullet points using HTML list formatting (`<ul>` and `<li>`).";
-            const payload = { contents: [{ parts: [{ text }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
-            const result = await callGeminiAPI('gemini-2.5-flash', payload);
-            if (result) showModal('Summary', result.candidates?.[0]?.content?.parts?.[0]?.text);
-            setStatus('Summary complete.');
-         }
-        async function readAloud() { 
-            const text = editor.textContent;
-            if (!text.trim()) return setStatus('Editor is empty.');
-            setStatus('Generating audio...', true);
-            if(currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
-            const payload = { contents: [{ parts: [{ text: `Say this naturally: ${text}` }] }], generationConfig: { responseModalities: ["AUDIO"] } };
-            const result = await callGeminiAPI('gemini-2.5-flash-preview-tts', payload);
-            const audioData = result?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-            if (!audioData) return setStatus('Failed to generate audio.');
-            try {
-                const pcmData = base64ToArrayBuffer(audioData);
-                const pcm16 = new Int16Array(pcmData);
-                const wavBlob = pcmToWav(pcm16);
-                currentAudioUrl = URL.createObjectURL(wavBlob);
-                audioPlayer.src = currentAudioUrl;
-                audioPlayerContainer.classList.remove('hidden');
-                audioPlayer.play();
-                setStatus('Playing audio.');
-            } catch (e) {
-                console.error("Error processing audio data:", e);
-                setStatus('Error playing audio.');
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            loadApiKey();
-            saveApiKeyBtn.addEventListener('click', saveApiKey);
-            editor.addEventListener('input', updateButtonStates); 
-            document.getElementById('fullReviewBtn').addEventListener('click', getFullReview);
-            document.getElementById('checkGrammarBtn').addEventListener('click', checkGrammarAndStyle);
-            document.getElementById('spellCheckBtn').addEventListener('click', checkSpelling);
-            document.getElementById('vocabEnhancerBtn').addEventListener('click', enhanceVocabulary);
-            document.getElementById('changeToneBtn').addEventListener('click', openToneChanger);
-            document.getElementById('humanizeBtn').addEventListener('click', humanizeText);
-            document.getElementById('plagiarismBtn').addEventListener('click', checkPlagiarism);
-            document.getElementById('factCheckBtn').addEventListener('click', factCheck);
-            document.getElementById('aiContentBtn').addEventListener('click', checkAiContent);
-            document.getElementById('summarizeBtn').addEventListener('click', summarizeText);
-            document.getElementById('readAloudBtn').addEventListener('click', readAloud);
-            clearHighlightsBtn.addEventListener('click', clearHighlights);
-            closeModalBtn.addEventListener('click', () => resultsModal.style.display = 'none');
-
-            editor.addEventListener('click', (e) => {
-                if (e.target.classList.contains('highlight')) {
-                    const target = e.target;
-                    const suggestion = target.dataset.suggestion;
-                    const explanation = target.dataset.explanation;
-                    let tooltipHtml = `<p class="text-sm text-gray-300">${explanation}</p><button class="suggestion-btn" onclick="applySuggestion('${target.id}', '${suggestion}')">${suggestion}</button>`;
-                    showTooltip(target, tooltipHtml);
-                    e.stopPropagation();
-                }
-            });
-            document.addEventListener('click', (e) => { if (!tooltip.contains(e.target) || !e.target.closest('.highlight')) hideTooltip(); });
-        });
-        
-        function showModal(title, content) { modalTitle.textContent = title; modalContent.innerHTML = content; resultsModal.style.display = 'flex'; }
-        function showTooltip(targetElement, content) { tooltipContent.innerHTML = content; tooltip.style.display = 'block'; const rect = targetElement.getBoundingClientRect(); tooltip.style.left = `${rect.left + window.scrollX + (rect.width / 2) - (tooltip.offsetWidth / 2)}px`; tooltip.style.top = `${rect.bottom + window.scrollY + 5}px`; }
-        function hideTooltip() { tooltip.style.display = 'none'; }
-        function applySuggestion(spanId, suggestion) { const span = document.getElementById(spanId); if (span) { span.replaceWith(document.createTextNode(suggestion)); editor.normalize(); hideTooltip(); } }
-        function applyHighlights(highlights) { 
-            let content = editor.textContent; 
-            let offset = 0; 
-            highlights.sort((a, b) => a.index - b.index); 
-            highlights.forEach(h => { 
-                suggestionCounter++; 
-                const id = `suggestion-${suggestionCounter}`; 
-                originalTextMap.set(id, h.original); 
-                const before = content.substring(0, h.index + offset);
-                const original = content.substring(h.index + offset, h.index + offset + h.original.length); 
-                const after = content.substring(h.index + offset + h.original.length); 
-                const span = `<span id="${id}" class="highlight ${h.type}" data-suggestion="${h.suggestion}" data-explanation="${h.explanation}">${original}</span>`; 
-                content = before + span + after; 
-                offset += span.length - h.original.length; 
-            }); 
-            editor.innerHTML = content; 
-        }
-        function clearHighlights() { setStatus('Clearing highlights...'); editor.querySelectorAll('.highlight').forEach(span => { const originalText = originalTextMap.get(span.id) || span.textContent; span.replaceWith(document.createTextNode(originalText)); }); editor.normalize(); setStatus('Ready'); hideTooltip(); }
-        
-        function base64ToArrayBuffer(base64) {
-            const binaryString = window.atob(base64);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) { bytes[i] = binaryString.charCodeAt(i); }
-            return bytes.buffer;
-         }
-        function pcmToWav(pcmData, sampleRate = 24000, channels = 1, bitsPerSample = 16) { 
-            const blockAlign = channels * (bitsPerSample / 8);
-            const byteRate = sampleRate * blockAlign;
-            const dataSize = pcmData.length * (bitsPerSample / 8);
-            const buffer = new ArrayBuffer(44 + dataSize);
-            const view = new DataView(buffer);
-            function writeString(view, offset, string) { for (let i = 0; i < string.length; i++) { view.setUint8(offset + i, string.charCodeAt(i)); } }
-            writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + dataSize, true);
-            writeString(view, 8, 'WAVE');
-            writeString(view, 12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true);
-            view.setUint16(22, channels, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, byteRate, true);
-            view.setUint16(32, blockAlign, true);
-            view.setUint16(34, bitsPerSample, true);
-            writeString(view, 36, 'data');
-            view.setUint32(40, dataSize, true);
-            let offset = 44;
-            for (let i = 0; i < pcmData.length; i++, offset += 2) { view.setInt16(offset, pcmData[i], true); }
-            return new Blob([view], { type: 'audio/wav' });
-        }
     </script>
 </body>
 </html>

@@ -208,6 +208,7 @@
         let isProcessing = false;
         let abortController = null;
         let cache = new Map();
+        let progressInterval = null;
 
         const els = {
             editor: document.getElementById('editor'),
@@ -220,6 +221,7 @@
         };
 
         // --- INIT ---
+        document.getElementById('statusBadge').classList.remove('hidden');
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
         }
@@ -250,6 +252,37 @@
             setTimeout(() => toast.remove(), 3000);
         }
         
+        function startSimulatedProgress() {
+            let width = 10;
+            let counter = 0;
+            els.progressBar.style.width = '10%';
+            
+            if (progressInterval) clearInterval(progressInterval);
+            
+            progressInterval = setInterval(() => {
+                counter++;
+                // Slow down progress as it gets higher
+                if (width < 60) width += 2;
+                else if (width < 85) width += 0.5;
+                else if (width < 95) width += 0.1;
+                
+                els.progressBar.style.width = width + '%';
+                
+                // UX Feedback for wait time
+                if (counter === 50) { // Approx 5 seconds
+                   els.progressText.textContent = "Waiting in Server Queue..."; 
+                }
+                if (counter === 150) { // Approx 15 seconds
+                   els.progressText.textContent = "Server is busy, hold on..."; 
+                }
+            }, 100);
+        }
+        
+        function stopSimulatedProgress() {
+            if (progressInterval) clearInterval(progressInterval);
+            els.progressBar.style.width = '100%';
+        }
+        
         // --- QUEUE SYSTEM ---
         class RequestQueue {
             constructor() {
@@ -267,6 +300,7 @@
                 this.isStopped = true;
                 this.queue = [];
                 this.isProcessing = false;
+                stopSimulatedProgress();
                 els.panelProgress.classList.add('hidden');
                 showToast("Analysis stopped.", 'error');
             }
@@ -276,7 +310,6 @@
                 this.isProcessing = true;
                 const task = this.queue.shift();
                 
-                // Backend handles rate limiting logic
                 try {
                     await task();
                 } catch(e) {
@@ -293,7 +326,6 @@
             const cacheKey = JSON.stringify(payload);
             if (cache.has(cacheKey)) return cache.get(cacheKey);
 
-            // Backend expects just the prompt string
             const promptText = payload.contents?.[0]?.parts?.[0]?.text;
             if (!promptText) return null;
 
@@ -306,17 +338,30 @@
                 });
 
                 if (!response.ok) {
-                    const txt = await response.text();
-                    throw new Error(`Server Error: ${response.status} - ${txt}`);
+                    // Try to parse error message safely
+                    let errorMsg = `Server Error: ${response.status}`;
+                    try {
+                        const errJson = await response.json();
+                        if (errJson.error) errorMsg = errJson.error;
+                    } catch(e) {
+                         // Fallback to text if json fails
+                         const txt = await response.text();
+                         if(txt) errorMsg = `Server Error: ${response.status} - ${txt.substring(0, 50)}...`;
+                    }
+                    throw new Error(errorMsg);
                 }
                 
                 const rawText = await response.text();
-                // Safety check for empty body before parsing
-                if (!rawText) throw new Error("Server returned empty response");
+                if (!rawText) throw new Error("Empty response from server");
+
+                let data;
+                try {
+                    data = JSON.parse(rawText);
+                } catch (parseError) {
+                    console.error("Failed to parse response JSON:", rawText);
+                    throw new Error("Invalid JSON response from server");
+                }
                 
-                const data = JSON.parse(rawText);
-                
-                // Convert simple text response back to Gemini format for compatibility
                 const geminiStyleResponse = {
                     candidates: [{
                         content: {
@@ -330,8 +375,9 @@
             } catch (e) {
                 if (e.name !== 'AbortError') {
                     console.error(e);
-                    const msg = e.message.includes("500") ? "Server Error. Check API Key." : e.message;
-                    showToast(msg, 'error');
+                    // Simplify user facing error message
+                    const displayMsg = e.message.includes("Queue too slow") ? "Server Busy - Queue Full" : e.message;
+                    showToast(displayMsg, 'error');
                 }
                 return null;
             }
@@ -378,7 +424,9 @@
             globalQueue.isStopped = false;
             els.panelProgress.classList.remove('hidden');
             els.progressText.textContent = `Running ${type}...`;
-            els.progressBar.style.width = '10%';
+            
+            // Start Simulated Progress
+            startSimulatedProgress();
 
             try {
                 let resultHTML = "";
@@ -387,7 +435,7 @@
                     const suspectsPrompt = `Identify the top 3 sentences in this text that are most likely to be plagiarized. Return strictly a JSON array of strings: ["sentence 1", "sentence 2"]`;
                     const res = await callGemini({ contents: [{ parts: [{ text: suspectsPrompt + `\n\nTEXT: """${text}"""` }] }] }, priority);
                     
-                    if (!res) return;
+                    if (!res) { stopSimulatedProgress(); return; }
                     
                     let suspects = [];
                     try { 
@@ -400,6 +448,8 @@
                          suspects = sent.slice(0, 3);
                     }
                     
+                    // Stop simulation for manual queue updates
+                    stopSimulatedProgress();
                     els.progressBar.style.width = '30%';
                     let matches = [];
                     let processed = 0;
@@ -447,10 +497,14 @@
                     
                     if (!claims.length) {
                          els.resultsContent.innerHTML = "No verifiable claims found.";
+                         stopSimulatedProgress();
                          els.panelProgress.classList.add('hidden');
                          return;
                     }
                     
+                    // Stop simulation for manual queue updates
+                    stopSimulatedProgress();
+                    els.progressBar.style.width = '10%';
                     let factResults = [];
                     let processed = 0;
                     
@@ -484,56 +538,65 @@
                 } else if (type === 'Grammar' || type === 'Spelling' || type === 'Vocab') {
                     const prompt = `Analyze for ${type}. Return JSON array: [{"original": "...", "suggestion": "...", "explanation": "..."}]`;
                     const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] }, priority);
+                    stopSimulatedProgress();
                     
-                    if (!res) return;
-                    let items = [];
-                    try { 
-                        const extracted = extractJson(res);
-                        if (extracted) {
-                            const parsed = JSON.parse(extracted);
-                            if (Array.isArray(parsed)) items = parsed;
-                        }
-                    } catch(e){}
-                    
-                    applyHighlights(items, type.toLowerCase());
-                    resultHTML = `<div class="text-center p-10"><div class="bg-green-100 dark:bg-green-900/30 text-green-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></div><h3 class="font-bold text-lg">Proofing Complete</h3><p class="text-sm text-gray-500">Found ${items.length} suggestions. Click highlighted text to apply.</p></div>`;
-                    els.resultsContent.innerHTML = resultHTML;
-                    els.panelProgress.classList.add('hidden');
+                    if (res) {
+                        let items = [];
+                        try { 
+                            const extracted = extractJson(res);
+                            if (extracted) {
+                                const parsed = JSON.parse(extracted);
+                                if (Array.isArray(parsed)) items = parsed;
+                            }
+                        } catch(e){}
+                        
+                        applyHighlights(items, type.toLowerCase());
+                        resultHTML = `<div class="text-center p-10"><div class="bg-green-100 dark:bg-green-900/30 text-green-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></div><h3 class="font-bold text-lg">Proofing Complete</h3><p class="text-sm text-gray-500">Found ${items.length} suggestions. Click highlighted text to apply.</p></div>`;
+                        els.resultsContent.innerHTML = resultHTML;
+                        els.panelProgress.classList.add('hidden');
+                    }
                 
                 } else if (type === 'Full Review') {
                     const prompt = `Act as an editor. Return HTML report with <h3> headers for Clarity, Structure, Grammar. Use Tailwind classes.`;
                     const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] }, priority);
+                    stopSimulatedProgress();
                     
-                    if (!res) return;
-                    const prevContent = els.resultsContent.innerHTML;
-                    els.resultsContent.innerHTML = prevContent.replace(/<div class="skeleton.*<\/div>/g, '') + res.candidates[0].content.parts[0].text;
-                    els.panelProgress.classList.add('hidden');
+                    if (res) {
+                        const prevContent = els.resultsContent.innerHTML;
+                        els.resultsContent.innerHTML = prevContent.replace(/<div class="skeleton.*<\/div>/g, '') + res.candidates[0].content.parts[0].text;
+                        els.panelProgress.classList.add('hidden');
+                    }
                     
                 } else if (type === 'Summarize') {
                     const prompt = `Summarize this in HTML bullet points.`;
                     const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] }, priority);
+                    stopSimulatedProgress();
                     
-                    if (!res) return;
-                    els.resultsContent.innerHTML = `<h3 class="font-bold mb-2">Summary</h3>` + res.candidates[0].content.parts[0].text;
-                    els.panelProgress.classList.add('hidden');
+                    if (res) {
+                        els.resultsContent.innerHTML = `<h3 class="font-bold mb-2">Summary</h3>` + res.candidates[0].content.parts[0].text;
+                        els.panelProgress.classList.add('hidden');
+                    }
                     
                 } else if (type === 'AI Check') {
                      const prompt = `Analyze for AI generation (perplexity/burstiness). Return JSON: {"probability": 0.XX, "explanation": "..."}.`;
                      const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] }, priority);
+                     stopSimulatedProgress();
                      
-                     if (!res) return;
-                     let data = {};
-                     try { 
-                        const extracted = extractJson(res);
-                        if (extracted) data = JSON.parse(extracted); 
-                    } catch(e){}
-                     const score = Math.round(data.probability * 100);
-                     const color = score > 50 ? 'text-purple-600' : 'text-green-600';
-                     els.resultsContent.innerHTML = `<div class="text-center"><div class="text-4xl font-bold ${color} mb-2">${score}%</div><p class="text-sm text-gray-500">Likelihood of AI generation</p></div><div class="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">${data.explanation}</div>`;
-                     els.panelProgress.classList.add('hidden');
+                     if (res) {
+                         let data = {};
+                         try { 
+                            const extracted = extractJson(res);
+                            if (extracted) data = JSON.parse(extracted); 
+                        } catch(e){}
+                         const score = Math.round(data.probability * 100);
+                         const color = score > 50 ? 'text-purple-600' : 'text-green-600';
+                         els.resultsContent.innerHTML = `<div class="text-center"><div class="text-4xl font-bold ${color} mb-2">${score}%</div><p class="text-sm text-gray-500">Likelihood of AI generation</p></div><div class="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">${data.explanation}</div>`;
+                         els.panelProgress.classList.add('hidden');
+                     }
                 }
 
             } catch (e) {
+                stopSimulatedProgress();
                 if (e.name !== 'AbortError') {
                     console.error(e);
                     els.resultsContent.innerHTML = `<div class="text-red-500 text-center p-4">Analysis Failed. Please try again.</div>`;

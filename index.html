@@ -73,7 +73,7 @@
             </div>
             
             <div class="flex items-center gap-2">
-                <div id="statusBadge" class="hidden px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 flex items-center gap-1.5">
+                <div id="statusBadge" class="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 flex items-center gap-1.5">
                     <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Server Active
                 </div>
                 <button id="themeToggle" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 transition">
@@ -107,26 +107,26 @@
                 <div class="space-y-6">
                     <div>
                         <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Analysis</h3>
-                        <button onclick="runAnalysis('Full Review')" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>Full Audit Report</button>
-                        <button onclick="runAnalysis('Plagiarism')" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Plagiarism Check</button>
-                        <button onclick="runAnalysis('Fact Check')" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Fact Verification</button>
-                        <button onclick="runAnalysis('AI Check')" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>AI Detection</button>
+                        <button onclick="runAnalysis('Full Review', 2)" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>Full Audit Report</button>
+                        <button onclick="runAnalysis('Plagiarism', 5)" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Plagiarism Check</button>
+                        <button onclick="runAnalysis('Fact Check', 5)" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Fact Verification</button>
+                        <button onclick="runAnalysis('AI Check', 2)" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>AI Detection</button>
                     </div>
 
                     <div>
                         <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Proofing</h3>
                         <div class="grid grid-cols-3 gap-1">
-                            <button onclick="runAnalysis('Grammar')" class="tool-btn p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-blue-50 text-xs font-medium text-center border border-gray-200 dark:border-gray-600">Grammar</button>
-                            <button onclick="runAnalysis('Spelling')" class="tool-btn p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-blue-50 text-xs font-medium text-center border border-gray-200 dark:border-gray-600">Spelling</button>
-                            <button onclick="runAnalysis('Vocab')" class="tool-btn p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-blue-50 text-xs font-medium text-center border border-gray-200 dark:border-gray-600">Vocab</button>
+                            <button onclick="runAnalysis('Grammar', 1)" class="tool-btn p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-blue-50 text-xs font-medium text-center border border-gray-200 dark:border-gray-600">Grammar</button>
+                            <button onclick="runAnalysis('Spelling', 1)" class="tool-btn p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-blue-50 text-xs font-medium text-center border border-gray-200 dark:border-gray-600">Spelling</button>
+                            <button onclick="runAnalysis('Vocab', 1)" class="tool-btn p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-blue-50 text-xs font-medium text-center border border-gray-200 dark:border-gray-600">Vocab</button>
                         </div>
                     </div>
 
                     <div>
                         <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Transform</h3>
                         <button onclick="openToneModal()" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">Change Tone</button>
-                        <button onclick="runAnalysis('Humanize')" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">Humanize Text</button>
-                        <button onclick="runAnalysis('Summarize')" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">Summarize</button>
+                        <button onclick="runAnalysis('Humanize', 1)" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">Humanize Text</button>
+                        <button onclick="runAnalysis('Summarize', 1)" class="tool-btn w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">Summarize</button>
                     </div>
                 </div>
             </div>
@@ -201,7 +201,7 @@
         // --- CONFIG & STATE ---
         if (typeof pdfjsLib !== 'undefined') pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
         
-        // --- YOUR BACKEND URL (Confirmed Live) ---
+        // --- YOUR LIVE BACKEND URL ---
         const BACKEND_URL = "https://prooflens-hzq2.onrender.com/analyze"; 
 
         let requestQueue = [];
@@ -220,7 +220,6 @@
         };
 
         // --- INIT ---
-        document.getElementById('statusBadge').classList.remove('hidden');
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
         }
@@ -277,6 +276,7 @@
                 this.isProcessing = true;
                 const task = this.queue.shift();
                 
+                // Backend handles rate limiting logic
                 try {
                     await task();
                 } catch(e) {
@@ -289,10 +289,11 @@
         }
         const globalQueue = new RequestQueue();
 
-        async function callGemini(payload, tools = false) {
+        async function callGemini(payload, priority = 5) {
             const cacheKey = JSON.stringify(payload);
             if (cache.has(cacheKey)) return cache.get(cacheKey);
 
+            // Backend expects just the prompt string
             const promptText = payload.contents?.[0]?.parts?.[0]?.text;
             if (!promptText) return null;
 
@@ -300,17 +301,22 @@
                 const response = await fetch(BACKEND_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: promptText }),
+                    body: JSON.stringify({ prompt: promptText, priority: priority }),
                     signal: abortController?.signal
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Server Error: ${response.status} ${response.statusText}`);
+                    const txt = await response.text();
+                    throw new Error(`Server Error: ${response.status} - ${txt}`);
                 }
                 
-                const data = await response.json();
+                const rawText = await response.text();
+                // Safety check for empty body before parsing
+                if (!rawText) throw new Error("Server returned empty response");
                 
-                // Reconstruct to match expected format by frontend logic
+                const data = JSON.parse(rawText);
+                
+                // Convert simple text response back to Gemini format for compatibility
                 const geminiStyleResponse = {
                     candidates: [{
                         content: {
@@ -323,9 +329,8 @@
                 return geminiStyleResponse;
             } catch (e) {
                 if (e.name !== 'AbortError') {
-                    console.error("Connection Error:", e);
-                    // Show descriptive error from server if available
-                    const msg = e.message.includes("500") ? "Server Error (Check API Key)" : e.message;
+                    console.error(e);
+                    const msg = e.message.includes("500") ? "Server Error. Check API Key." : e.message;
                     showToast(msg, 'error');
                 }
                 return null;
@@ -343,7 +348,7 @@
 
         // --- FEATURES ---
 
-        async function runAnalysis(type) {
+        async function runAnalysis(type, priority = 5) {
             const text = els.editor.innerText;
             if (!text.trim()) return showToast("Please add some text first.", 'error');
             
@@ -380,7 +385,7 @@
                 
                 if (type === 'Plagiarism') {
                     const suspectsPrompt = `Identify the top 3 sentences in this text that are most likely to be plagiarized. Return strictly a JSON array of strings: ["sentence 1", "sentence 2"]`;
-                    const res = await callGemini({ contents: [{ parts: [{ text: suspectsPrompt + `\n\nTEXT: """${text}"""` }] }] });
+                    const res = await callGemini({ contents: [{ parts: [{ text: suspectsPrompt + `\n\nTEXT: """${text}"""` }] }] }, priority);
                     
                     if (!res) return;
                     
@@ -404,7 +409,7 @@
                             if (globalQueue.isStopped) return;
                             els.progressText.textContent = `Checking segment ${i+1}/${suspects.length}...`;
                             
-                            const searchRes = await callGemini({ contents: [{ parts: [{ text: `Search Google for exactly: "${s}". Return JSON: {"snippet": "...", "url": "..."}` }] }] }, true);
+                            const searchRes = await callGemini({ contents: [{ parts: [{ text: `Search Google for exactly: "${s}". Return JSON: {"snippet": "...", "url": "..."}` }] }] }, priority);
                             
                             if (searchRes) {
                                 let data = {};
@@ -432,7 +437,7 @@
 
                 } else if (type === 'Fact Check') {
                     const claimPrompt = `Extract distinct factual claims. Return strictly JSON: {"claims": ["claim 1", "claim 2"]}`;
-                    const res = await callGemini({ contents: [{ parts: [{ text: claimPrompt + `\n\nTEXT: """${text}"""` }] }] });
+                    const res = await callGemini({ contents: [{ parts: [{ text: claimPrompt + `\n\nTEXT: """${text}"""` }] }] }, priority);
                     
                     let claims = [];
                     try { 
@@ -478,7 +483,7 @@
 
                 } else if (type === 'Grammar' || type === 'Spelling' || type === 'Vocab') {
                     const prompt = `Analyze for ${type}. Return JSON array: [{"original": "...", "suggestion": "...", "explanation": "..."}]`;
-                    const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] });
+                    const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] }, priority);
                     
                     if (!res) return;
                     let items = [];
@@ -497,7 +502,7 @@
                 
                 } else if (type === 'Full Review') {
                     const prompt = `Act as an editor. Return HTML report with <h3> headers for Clarity, Structure, Grammar. Use Tailwind classes.`;
-                    const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] });
+                    const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] }, priority);
                     
                     if (!res) return;
                     const prevContent = els.resultsContent.innerHTML;
@@ -506,7 +511,7 @@
                     
                 } else if (type === 'Summarize') {
                     const prompt = `Summarize this in HTML bullet points.`;
-                    const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] });
+                    const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] }, priority);
                     
                     if (!res) return;
                     els.resultsContent.innerHTML = `<h3 class="font-bold mb-2">Summary</h3>` + res.candidates[0].content.parts[0].text;
@@ -514,7 +519,7 @@
                     
                 } else if (type === 'AI Check') {
                      const prompt = `Analyze for AI generation (perplexity/burstiness). Return JSON: {"probability": 0.XX, "explanation": "..."}.`;
-                     const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] });
+                     const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] }, priority);
                      
                      if (!res) return;
                      let data = {};
@@ -545,7 +550,7 @@
             if (!text.trim()) return;
             
             showToast(`Rewriting in ${tone} tone...`);
-            const res = await callGemini({ contents: [{ parts: [{ text: `Rewrite this in a ${tone} tone:\n\n${text}` }] }] });
+            const res = await callGemini({ contents: [{ parts: [{ text: `Rewrite this in a ${tone} tone:\n\n${text}` }] }] }, 1); // High Priority
             if (res) els.editor.innerText = res.candidates[0].content.parts[0].text;
         }
 

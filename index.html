@@ -141,6 +141,7 @@
 
         <!-- Center: Editor -->
         <main class="flex-grow flex flex-col h-full overflow-hidden bg-gray-50 dark:bg-dark-900 relative">
+            
             <!-- Editor -->
             <div class="flex-grow overflow-y-auto p-8 md:p-12">
                 <div class="max-w-3xl mx-auto bg-white dark:bg-dark-800 min-h-[800px] shadow-sm rounded-xl p-8 md:p-12 border border-gray-100 dark:border-gray-700 transition-colors">
@@ -200,7 +201,7 @@
         // --- CONFIG & STATE ---
         if (typeof pdfjsLib !== 'undefined') pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
         
-        // --- YOUR BACKEND URL ---
+        // --- YOUR BACKEND URL (Confirmed Live) ---
         const BACKEND_URL = "https://prooflens-hzq2.onrender.com/analyze"; 
 
         let requestQueue = [];
@@ -219,7 +220,6 @@
         };
 
         // --- INIT ---
-        // Automatically enable buttons on load since we are using a backend
         document.getElementById('statusBadge').classList.remove('hidden');
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
@@ -277,7 +277,6 @@
                 this.isProcessing = true;
                 const task = this.queue.shift();
                 
-                // Backend handles rate limiting logic
                 try {
                     await task();
                 } catch(e) {
@@ -294,7 +293,6 @@
             const cacheKey = JSON.stringify(payload);
             if (cache.has(cacheKey)) return cache.get(cacheKey);
 
-            // Backend expects just the prompt string
             const promptText = payload.contents?.[0]?.parts?.[0]?.text;
             if (!promptText) return null;
 
@@ -306,20 +304,13 @@
                     signal: abortController?.signal
                 });
 
-                if (!response.ok) throw new Error(`Server Error: ${response.status}`);
-                
-                const rawText = await response.text();
-                if (!rawText) throw new Error("Empty response from server");
-
-                let data;
-                try {
-                    data = JSON.parse(rawText);
-                } catch (parseError) {
-                    console.error("Failed to parse response JSON:", rawText);
-                    throw new Error("Invalid JSON response from server");
+                if (!response.ok) {
+                    throw new Error(`Server Error: ${response.status} ${response.statusText}`);
                 }
                 
-                // Convert simple text response back to Gemini format for compatibility
+                const data = await response.json();
+                
+                // Reconstruct to match expected format by frontend logic
                 const geminiStyleResponse = {
                     candidates: [{
                         content: {
@@ -332,8 +323,10 @@
                 return geminiStyleResponse;
             } catch (e) {
                 if (e.name !== 'AbortError') {
-                    console.error(e);
-                    showToast("Error connecting to server.", 'error');
+                    console.error("Connection Error:", e);
+                    // Show descriptive error from server if available
+                    const msg = e.message.includes("500") ? "Server Error (Check API Key)" : e.message;
+                    showToast(msg, 'error');
                 }
                 return null;
             }
@@ -484,7 +477,6 @@
                     });
 
                 } else if (type === 'Grammar' || type === 'Spelling' || type === 'Vocab') {
-                    // Standard single-call checks
                     const prompt = `Analyze for ${type}. Return JSON array: [{"original": "...", "suggestion": "...", "explanation": "..."}]`;
                     const res = await callGemini({ contents: [{ parts: [{ text: prompt + `\n\nTEXT: """${text}"""` }] }] });
                     
